@@ -158,3 +158,37 @@ EXCEPTION
 END;
 
 
+-- Crear un servicio que permita a un usuario seleccionar un idioma para aprender. Se debe considerar
+-- que el usuario debe tener un asistente virtual de rol tutor para aprender idiomas, en caso de que no lo
+-- tenga se debe devolver un mensaje de error descriptivo.
+
+CREATE OR REPLACE PROCEDURE seleccionar_idioma (
+    p_id_usuario IN NUMBER,
+    p_id_idioma IN NUMBER
+) IS
+    v_id_asistente NUMBER;
+    v_tiene_rol_tutor NUMBER;
+BEGIN
+    -- Verificar si el usuario tiene un asistente con el rol 'TUTOR'
+    SELECT av.id_asistente INTO v_id_asistente
+    FROM ASISTENTES_VIRTUALES av
+    JOIN ASISTENTE_ROLES ar ON av.id_asistente = ar.id_asistente
+    WHERE av.id_usuario = p_id_usuario
+      AND ar.nombre_rol = 'TUTOR'
+    FETCH FIRST 1 ROWS ONLY;
+
+    -- Si se encuentra un asistente con rol 'TUTOR', registrar el idioma
+    INSERT INTO ASISTENTE_TUTOR_IDIOMAS (
+        id_asistente, id_idioma
+    ) VALUES (
+        v_id_asistente, p_id_idioma
+    );
+
+    COMMIT;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20013, 'El usuario no tiene un asistente virtual con el rol "TUTOR". No se puede seleccionar un idioma.');
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20014, 'Ocurrió un error al seleccionar el idioma: ' || SQLERRM);
+END;

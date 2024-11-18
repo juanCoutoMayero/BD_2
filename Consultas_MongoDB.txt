@@ -1,0 +1,56 @@
+--Consultas MongoDB
+
+--Requerimiento 5: Buscar mensajes que contengan cierto texto en la última semana
+
+db.usuarios.find(
+    {
+        "_id": "usuario_123",
+        "interacciones.fecha_hora": { $gte: new Date(new Date().setDate(new Date().getDate() - 7)) },
+        "interacciones.respuestas_asistente.texto": { $regex: "texto a buscar", $options: "i" }
+    },
+    {
+        "interacciones.$": 1
+    }
+);
+
+
+--Requerimiento 6: Obtener todas las conversaciones de un usuario y un asistente en un rango de fechas, agrupadas por tipo de interacción
+
+
+db.usuarios.aggregate([
+    {
+        $match: {
+            "_id": "usuario_123",
+            "interacciones.fecha_hora": {
+                $gte: new Date("2024-11-01T00:00:00Z"),
+                $lte: new Date("2024-11-15T23:59:59Z")
+            }
+        }
+    },
+    {
+        $unwind: "$interacciones"
+    },
+    {
+        $group: {
+            _id: "$interacciones.tipo",
+            interacciones: { $push: "$interacciones" }
+        }
+    }
+]);
+
+
+-- Requerimiento 7: Devolver todos los logros de un usuario indicando el idioma del logro, ordenados por fecha de forma decreciente
+
+
+db.usuarios.find(
+    {
+        "_id": "usuario_123"
+    },
+    {
+        "progreso_aprendizaje.logros_certificaciones": 1
+    }
+).sort(
+    { "progreso_aprendizaje.logros_certificaciones.fecha_obtencion": -1 }
+);
+
+
