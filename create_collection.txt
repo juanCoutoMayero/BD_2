@@ -1,0 +1,129 @@
+db.createCollection("usuarios", {
+    validator: {
+        $jsonSchema: {
+            bsonType: "object",
+            required: ["_id", "nombre", "email", "fecha_registro", "interacciones", "progreso_aprendizaje"],
+            properties: {
+                _id: {
+                    bsonType: "string",
+                    description: "Debe ser un string y es obligatorio."
+                },
+                nombre: {
+                    bsonType: "string",
+                    description: "Debe ser un string y es obligatorio."
+                },
+                email: {
+                    bsonType: "string",
+                    pattern: "^.+@.+\\..+$",
+                    description: "Debe ser un string con formato de correo electrónico y es obligatorio."
+                },
+                fecha_registro: {
+                    bsonType: "date",
+                    description: "Debe ser una fecha y es obligatorio."
+                },
+                interacciones: {
+                    bsonType: "array",
+                    description: "Debe ser un array de interacciones.",
+                    items: {
+                        bsonType: "object",
+                        required: ["id_interaccion", "fecha_hora", "tipo", "idioma", "respuestas_asistente"],
+                        properties: {
+                            id_interaccion: {
+                                bsonType: "string",
+                                description: "Debe ser un string y es obligatorio."
+                            },
+                            fecha_hora: {
+                                bsonType: "date",
+                                description: "Debe ser una fecha y es obligatorio."
+                            },
+                            tipo: {
+                                bsonType: "string",
+                                enum: ["consulta", "tutoría", "conversación casual", "coaching"],
+                                description: "Debe ser uno de los tipos permitidos y es obligatorio."
+                            },
+                            idioma: {
+                                bsonType: "string",
+                                description: "Debe ser un string y es obligatorio."
+                            },
+                            respuestas_asistente: {
+                                bsonType: "array",
+                                description: "Debe ser un array de respuestas generadas por el asistente.",
+                                items: {
+                                    bsonType: "object",
+                                    required: ["texto", "tipo_respuesta"],
+                                    properties: {
+                                        texto: {
+                                            bsonType: "string",
+                                            description: "Debe ser un string y es obligatorio."
+                                        },
+                                        tipo_respuesta: {
+                                            bsonType: "string",
+                                            description: "Debe ser un string y es obligatorio."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                progreso_aprendizaje: {
+                    bsonType: "object",
+                    required: ["sesiones_completadas", "niveles_idioma", "logros_certificaciones"],
+                    properties: {
+                        sesiones_completadas: {
+                            bsonType: "int",
+                            minimum: 0,
+                            description: "Debe ser un número entero mayor o igual a 0 y es obligatorio."
+                        },
+                        niveles_idioma: {
+                            bsonType: "array",
+                            description: "Debe ser un array de niveles de idioma.",
+                            items: {
+                                bsonType: "object",
+                                required: ["idioma", "nivel"],
+                                properties: {
+                                    idioma: {
+                                        bsonType: "string",
+                                        description: "Debe ser un string y es obligatorio."
+                                    },
+                                    nivel: {
+                                        bsonType: "string",
+                                        enum: ["Básico", "Intermedio", "Avanzado"],
+                                        description: "Debe ser uno de los niveles permitidos y es obligatorio."
+                                    }
+                                }
+                            }
+                        },
+                        logros_certificaciones: {
+                            bsonType: "array",
+                            description: "Debe ser un array de logros o certificaciones.",
+                            items: {
+                                bsonType: "object",
+                                required: ["nombre", "idioma", "fecha_obtencion", "nivel_dominio"],
+                                properties: {
+                                    nombre: {
+                                        bsonType: "string",
+                                        description: "Debe ser un string y es obligatorio."
+                                    },
+                                    idioma: {
+                                        bsonType: "string",
+                                        description: "Debe ser un string y es obligatorio."
+                                    },
+                                    fecha_obtencion: {
+                                        bsonType: "date",
+                                        description: "Debe ser una fecha y es obligatorio."
+                                    },
+                                    nivel_dominio: {
+                                        bsonType: "string",
+                                        enum: ["Básico", "Intermedio", "Avanzado"],
+                                        description: "Debe ser uno de los niveles de dominio permitidos y es obligatorio."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+});
