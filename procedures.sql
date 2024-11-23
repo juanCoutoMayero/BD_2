@@ -2,70 +2,124 @@
 -- virtual con rol amigo y su respectiva configuración predeterminada (apariencia). Aquella información
 -- que no se puede obtener de forma predeterminada se podrá enviar al servicio por parámetro.
 
-CREATE OR REPLACE PROCEDURE crear_usuario (
-    p_correo_electronico IN VARCHAR2,
-    p_nombre IN VARCHAR2,
-    p_contrasena IN VARCHAR2,
+CREATE OR REPLACE PROCEDURE sp_alta_usuario(
+    -- DATOS DE USUARIO
+    p_correo_electronico IN VARCHAR,
+    p_nombre IN VARCHAR,
+    p_contraseña IN VARCHAR,
     p_id_pais IN NUMBER,
     p_fecha_nacimiento IN DATE,
-    p_rango_edad IN VARCHAR2,
     p_genero IN CHAR,
-    p_telefono IN VARCHAR2,
-    p_version IN VARCHAR2,
-    p_id_apariencia_predeterminada IN NUMBER
-) IS
-    v_id_usuario NUMBER;
-    v_id_asistente NUMBER;
+    p_telefono IN VARCHAR,
+
+    -- DATOS DE ASISTENTE
+    p_nombre_asistente IN VARCHAR,
+    p_genero_asistente IN CHAR,
+    p_historia IN VARCHAR,
+    p_id_idioma IN NUMBER
+) AS
+    v_nuevo_id_usuario NUMBER;
+    v_nuevo_id_asistente NUMBER;
+    v_fecha_registro DATE := SYSDATE;
+    v_rango_edad VARCHAR2(20);
+    v_id_billetera NUMBER;
+    v_id_ropa_por_defecto NUMBER;
+    v_id_apariencia_por_defecto NUMBER;
+    v_contador_paises NUMBER;
+    v_contador_idiomas NUMBER;
 BEGIN
-    -- Insertar el nuevo usuario
-    INSERT INTO USUARIOS (
-        correo_electronico, nombre, contraseña, id_pais, fecha_nacimiento, rango_edad, genero, telefono, version
-    ) VALUES (
-        p_correo_electronico, p_nombre, p_contrasena, p_id_pais, p_fecha_nacimiento, p_rango_edad, p_genero, p_telefono, p_version
-    ) RETURNING id_usuario INTO v_id_usuario;
+    -- Validar que el país exista
+    SELECT COUNT(*)
+    INTO v_contador_paises
+    FROM PAISES
+    WHERE ID_PAIS = p_id_pais;
+    IF v_contador_paises = 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'El id_país no existe.');
+    END IF;
 
-    -- Crear un asistente virtual asociado al nuevo usuario
-    INSERT INTO ASISTENTES_VIRTUALES (
-        id_usuario, nombre_asistente, genero_asistente, descripcion
-    ) VALUES (
-        v_id_usuario, 'Asistente Predeterminado', 'NB', 'Asistente inicial con configuración predeterminada'
-    ) RETURNING id_asistente INTO v_id_asistente;
+    -- Calcular el rango de edad
+    SELECT fx_obtener_rango_edad(p_fecha_nacimiento)
+    INTO v_rango_edad
+    FROM DUAL;
 
-    -- Asignar el rol 'AMIGO' al asistente virtual
-    INSERT INTO ASISTENTE_ROLES (
-        id_asistente, nombre_rol
-    ) VALUES (
-        v_id_asistente, 'AMIGO'
-    );
+    -- Obtener la ropa por defecto (validar un solo registro)
+    SELECT id_producto INTO v_id_ropa_por_defecto
+    FROM productos p
+    JOIN TIPOS_PRODUCTO t ON p.ID_TIPO_PRODUCTO = t.ID_TIPO_PRODUCTO
+    WHERE t.TIPO_PRODUCTO LIKE '%ROPA%'
+    AND ROWNUM = 1;
 
-    -- Asignar la configuración predeterminada de apariencia al asistente
-    INSERT INTO CONFIGURACIONES_APARIENCIAS (
-        id_asistente, id_producto, seleccionado
-    ) VALUES (
-        v_id_asistente, p_id_apariencia_predeterminada, 1
-    );
+    -- Obtener la apariencia por defecto (validar un solo registro)
+    SELECT id_producto INTO v_id_apariencia_por_defecto
+    FROM productos p
+    JOIN TIPOS_PRODUCTO t ON p.ID_TIPO_PRODUCTO = t.ID_TIPO_PRODUCTO
+    WHERE t.TIPO_PRODUCTO LIKE '%APARIENCIA%'
+    AND ROWNUM = 1;
+
+    -- Insertar en USUARIOS
+    INSERT INTO USUARIOS
+    (CORREO_ELECTRONICO, NOMBRE, CONTRASEÑA, ID_PAIS, FECHA_NACIMIENTO,
+    FECHA_REGISTRO, RANGO_EDAD, GENERO, TELEFONO, VERSION)
+    VALUES (p_correo_electronico, p_nombre, p_contraseña, p_id_pais,
+    p_fecha_nacimiento, v_fecha_registro, v_rango_edad, p_genero, p_telefono, 'GRATUITA')
+    RETURNING id_usuario INTO v_nuevo_id_usuario;
+
+    -- Insertar en BILLETERA
+    INSERT INTO BILLETERA (MONEDAS, GEMAS, ID_USUARIO)
+    VALUES (0, 0, v_nuevo_id_usuario);
+
+    -- Insertar en ASISTENTES_VIRTUALES
+    INSERT INTO ASISTENTES_VIRTUALES (ID_USUARIO, NOMBRE_ASISTENTE, GENERO_ASISTENTE, DESCRIPCION)
+    VALUES (v_nuevo_id_usuario, p_nombre_asistente, p_genero_asistente, p_historia)
+    RETURNING id_asistente INTO v_nuevo_id_asistente;
+
+    -- Validar que el idioma exista
+    SELECT COUNT(*)
+    INTO v_contador_idiomas
+    FROM IDIOMAS
+    WHERE ID_IDIOMA = p_id_idioma;
+    IF v_contador_idiomas = 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'El id_idioma no existe.');
+    END IF;
+
+    -- Insertar en ASISTENTE_IDIOMAS
+    INSERT INTO ASISTENTE_IDIOMAS (ID_ASISTENTE, ID_IDIOMA)
+    VALUES (v_nuevo_id_asistente, p_id_idioma);
+
+    -- Insertar en CONFIGURACIONES_ROPA (Por defecto)
+    INSERT INTO CONFIGURACIONES_ROPA
+    (ID_ASISTENTE, ID_PRODUCTO, SELECCIONADO)
+    VALUES (v_nuevo_id_asistente, v_id_ropa_por_defecto, 1);
+
+    -- Insertar en CONFIGURACIONES_APARIENCIAS (Por defecto)
+    INSERT INTO CONFIGURACIONES_APARIENCIAS
+    (ID_ASISTENTE, ID_PRODUCTO, SELECCIONADO)
+    VALUES (v_nuevo_id_asistente, v_id_apariencia_por_defecto, 1);
 
     COMMIT;
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20008, 'Ocurrió un error al crear el usuario y su configuración: ' || SQLERRM);
-END;
+END sp_alta_usuario;
 
 
 -- Elaborar un servicio que permita efectuar la compra de una prenda de ropa para el asistente virtual de
 -- un determinado usuario. Tener en cuenta que si el usuario posee una suscripción Replika Pro activa
 -- se le debe aplicar un descuento del 15 %.
 
-CREATE OR REPLACE PROCEDURE comprar_ropa_asistente (
-    p_id_usuario IN NUMBER,
-    p_id_producto IN NUMBER,
-    p_id_asistente IN NUMBER
-) IS
-    v_precio_original NUMBER;
-    v_precio_final NUMBER;
-    v_tiene_suscripcion NUMBER;
+CREATE OR REPLACE PROCEDURE sp_comprar_ropa(
+    p_id_usuario in number,
+    p_id_producto in number,
+    p_id_tipo_producto in number
+) AS
+    v_precio_original number;
+    v_precio_final number;
+    v_tipo_suscripcion varchar(50);
+    v_id_asistente number;
+    
 BEGIN
+
     -- Verificar si el producto es una prenda de ropa
     SELECT PRECIO INTO v_precio_original
     FROM PRODUCTOS
@@ -75,44 +129,50 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20009, 'El producto especificado no es una prenda de ropa válida.');
     END IF;
 
-    -- Verificar si el usuario tiene una suscripción activa 'Replika Pro'
-    SELECT COUNT(*) INTO v_tiene_suscripcion
-    FROM SUSCRIPCIONES
-    WHERE ID_USUARIO = p_id_usuario
-      AND TIPO = '12 MESES'
-      AND FECHA_VENCIMIENTO > SYSDATE;
-
-    -- Calcular el precio final con descuento si tiene suscripción activa
-    IF v_tiene_suscripcion > 0 THEN
-        v_precio_final := v_precio_original * 0.85; -- Aplicar 15% de descuento
-    ELSE
-        v_precio_final := v_precio_original; -- Precio sin descuento
-    END IF;
-
-    -- Insertar la compra en la tabla COMPRAS_PRODUCTOS
-    INSERT INTO COMPRAS_PRODUCTOS (
-        ID_COMPRA, ID_USUARIO, FECHA_COMPRA, ID_PRODUCTO, ID_TIPO_PRODUCTO
-    ) VALUES (
-        SEQ_COMPRAS_PRODUCTOS.NEXTVAL, -- Asumimos que existe una secuencia para ID_COMPRA
-        p_id_usuario, SYSDATE, p_id_producto, (SELECT ID_TIPO_PRODUCTO FROM PRODUCTOS WHERE ID_PRODUCTO = p_id_producto)
-    );
-
-    -- Actualizar la configuración del asistente con la prenda comprada y seleccionada
-    INSERT INTO CONFIGURACIONES_ROPA (
-        ID, ID_ASISTENTE, ID_PRODUCTO, SELECCIONADO
-    ) VALUES (
-        SEQ_CONFIGURACIONES_ROPA.NEXTVAL, -- Asumimos que existe una secuencia para ID
-        p_id_asistente, p_id_producto, 1
-    );
+    -- Obtener el precio del producto
+    select precio
+    into v_precio_original
+    from productos p
+    join tipos_producto t on p.id_tipo_producto = t.id_tipo_producto
+    where p.id_producto = p_id_producto and t.tipo_producto like '%ROPA%';
+    
+    -- Verificar si el usuario tiene suscripcion PRO
+    select version
+    into v_tipo_suscripcion
+    from usuarios
+    where id_usuario = p_id_usuario;
+    
+    -- Obtener el id_asistente
+    select id_asistente
+    into v_id_asistente
+    from asistentes_virtuales
+    where id_usuario = p_id_usuario;
+    
+    if v_tipo_suscripcion like '%PRO%' then
+        v_precio_final := v_precio_original*0.85;
+    else
+        v_precio_final := v_precio_original;
+    end if;
+    
+    -- Insertar en COMPRAS_PRODUCTOS
+    insert into COMPRAS_PRODUCTOS
+    (ID_USUARIO, FECHA_COMPRA, ID_PRODUCTO, ID_TIPO_PRODUCTO)
+    values (p_id_usuario, SYSDATE, p_id_producto, p_id_tipo_producto);
+    
+    -- Insertar en CONFIGURACIONES_ROPA
+    insert into CONFIGURACIONES_ROPA
+    (ID_ASISTENTE, ID_PRODUCTO, SELECCIONADO)
+    values (v_id_asistente, p_id_producto, 0);
 
     COMMIT;
+
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
-        RAISE_APPLICATION_ERROR(-20010, 'El producto o la suscripción no se encontraron.');
+        RAISE_APPLICATION_ERROR(-20010, 'El producto  no se encontró.');
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20011, 'Ocurrió un error al efectuar la compra de la prenda: ' || SQLERRM);
-END;
+END sp_comprar_ropa;
 
 
 -- Implementar un servicio que acredite 50 gemas a los usuarios en el día de su cumpleaños. Los
@@ -128,33 +188,41 @@ BEGIN
         SELECT u.id_usuario, b.id_billetera
         FROM USUARIOS u
         JOIN BILLETERA b ON u.id_usuario = b.id_usuario
-        JOIN SUSCRIPCIONES s ON u.id_usuario = s.id_usuario
-        WHERE 
+        WHERE
             EXTRACT(MONTH FROM u.fecha_nacimiento) = EXTRACT(MONTH FROM SYSDATE)
             AND EXTRACT(DAY FROM u.fecha_nacimiento) = EXTRACT(DAY FROM SYSDATE)
             AND u.fecha_registro <= ADD_MONTHS(SYSDATE, -6)
-            AND s.tipo = '12 MESES'
-            AND s.fecha_vencimiento > SYSDATE
+            AND u.version like '%PRO%'
+            AND NOT EXISTS (
+                SELECT 1
+                FROM LOG_BENEFICIOS lb
+                WHERE lb.id_usuario = u.id_usuario
+                  AND lb.tipo_beneficio = 'Acreditación de gemas por cumpleaños'
+                  AND TRUNC(lb.fecha_beneficio) = TRUNC(SYSDATE)
+            )
     ) LOOP
-        -- Acreditar 50 gemas en la billetera del usuario
-        UPDATE BILLETERA
-        SET gemas = gemas + 50
-        WHERE id_billetera = usuario.id_billetera;
+        BEGIN
+            -- Acreditar 50 gemas en la billetera del usuario
+            UPDATE BILLETERA
+            SET gemas = gemas + 50
+            WHERE id_billetera = usuario.id_billetera;
 
-        -- Opcional: Registrar el crédito en un log de beneficios
-        INSERT INTO LOG_BENEFICIOS (
-            ID_LOG, ID_USUARIO, TIPO_BENEFICIO, FECHA_BENEFICIO, CANTIDAD
-        ) VALUES (
-            SEQ_LOG_BENEFICIOS.NEXTVAL, -- Asumimos que existe una secuencia para ID_LOG
-            usuario.id_usuario, 'Acreditación de gemas por cumpleaños', SYSDATE, 50
-        );
+            -- Registrar el crédito en un log de beneficios
+            INSERT INTO LOG_BENEFICIOS (
+                ID_LOG, ID_USUARIO, TIPO_BENEFICIO, FECHA_BENEFICIO, CANTIDAD
+            ) VALUES (
+                SEQ_LOG_BENEFICIOS.NEXTVAL, -- Asumimos que existe una secuencia para ID_LOG
+                usuario.id_usuario, 'Acreditación de gemas por cumpleaños', SYSDATE, 50
+            );
+
+            -- Confirmar transacción para este usuario
+            COMMIT;
+        EXCEPTION
+            WHEN OTHERS THEN
+                ROLLBACK;
+                RAISE_APPLICATION_ERROR(-20012, 'Ocurrió un error al acreditar gemas a los usuarios: ' || SQLERRM);
+        END;
     END LOOP;
-
-    COMMIT;
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20012, 'Ocurrió un error al acreditar gemas a los usuarios: ' || SQLERRM);
 END;
 
 
