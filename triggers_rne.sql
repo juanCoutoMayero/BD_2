@@ -55,3 +55,21 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20007, 'El producto debe tener una categoría asociada si es de tipo "APARIENCIAS" o "ROPA".');
     END IF;
 END;
+
+
+-- Restricción en PRODUCTOS. Solamente un PRODUCTO del mismo tipo de producto puede estar marcado como "por defecto".
+
+CREATE OR REPLACE TRIGGER desmarcar_producto_por_defecto
+BEFORE INSERT OR UPDATE ON PRODUCTOS
+FOR EACH ROW
+BEGIN
+    -- Si el nuevo producto está marcado como por defecto, desmarcar el producto por defecto actual en la misma categoría y tipo de producto
+    IF :NEW.POR_DEFECTO = 1 THEN
+        UPDATE PRODUCTOS
+        SET POR_DEFECTO = 0
+        WHERE ID_TIPO_PRODUCTO = :NEW.ID_TIPO_PRODUCTO
+          AND ID_CATEGORIA = :NEW.ID_CATEGORIA
+          AND POR_DEFECTO = 1
+          AND (:NEW.ID IS NULL OR ID <> :NEW.ID);  -- Evitar deseleccionar la misma fila en caso de UPDATE
+    END IF;
+END;
