@@ -209,9 +209,8 @@ BEGIN
 
             -- Registrar el crédito en un log de beneficios
             INSERT INTO LOG_BENEFICIOS (
-                ID_LOG, ID_USUARIO, TIPO_BENEFICIO, FECHA_BENEFICIO, CANTIDAD
+                ID_USUARIO, TIPO_BENEFICIO, FECHA_BENEFICIO, CANTIDAD
             ) VALUES (
-                SEQ_LOG_BENEFICIOS.NEXTVAL, -- Asumimos que existe una secuencia para ID_LOG
                 usuario.id_usuario, 'Acreditación de gemas por cumpleaños', SYSDATE, 50
             );
 

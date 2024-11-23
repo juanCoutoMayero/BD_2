@@ -14,9 +14,9 @@ BEGIN
     JOIN ASISTENTES_VIRTUALES av ON u.id_usuario = av.id_usuario
     WHERE av.id_asistente = :NEW.id_asistente;
     
-    -- Validar si el rol es 'Tutor' o 'Coach' y la versión no es 'Pro'
-    IF (:NEW.nombre_rol IN ('TUTOR', 'COACH') AND v_version != 'Pro') THEN
-        RAISE_APPLICATION_ERROR(-20001, 'El usuario debe tener la versión "Pro" para asignar roles de tipo "Tutor" o "Coach".');
+    -- Validar si el rol es 'TUTOR' o 'COACH' y la versión no es 'PRO'
+    IF (:NEW.nombre_rol IN ('TUTOR', 'COACH') AND v_version != 'PRO') THEN
+        RAISE_APPLICATION_ERROR(-20001, 'El usuario debe tener la versión "PRO" para asignar roles de tipo "TUTOR" o "COACH".');
     END IF;
 END;
 
