@@ -47,6 +47,7 @@ BEGIN
     FROM productos p
     JOIN TIPOS_PRODUCTO t ON p.ID_TIPO_PRODUCTO = t.ID_TIPO_PRODUCTO
     WHERE t.TIPO_PRODUCTO LIKE '%ROPA%'
+    AND p.POR_DEFECTO = 1
     AND ROWNUM = 1;
 
     -- Obtener la apariencia por defecto (validar un solo registro)
@@ -54,6 +55,7 @@ BEGIN
     FROM productos p
     JOIN TIPOS_PRODUCTO t ON p.ID_TIPO_PRODUCTO = t.ID_TIPO_PRODUCTO
     WHERE t.TIPO_PRODUCTO LIKE '%APARIENCIA%'
+    AND p.POR_DEFECTO = 1
     AND ROWNUM = 1;
 
     -- Insertar en USUARIOS
@@ -114,6 +116,7 @@ CREATE OR REPLACE PROCEDURE sp_comprar_ropa(
     p_id_tipo_producto in number
 ) AS
     v_precio_original number;
+    v_id_categoria number;
     v_precio_final number;
     v_tipo_suscripcion varchar(50);
     v_id_asistente number;
@@ -133,8 +136,7 @@ BEGIN
     select precio
     into v_precio_original
     from productos p
-    join tipos_producto t on p.id_tipo_producto = t.id_tipo_producto
-    where p.id_producto = p_id_producto and t.tipo_producto like '%ROPA%';
+    where p.id_producto = p_id_producto;
     
     -- Verificar si el usuario tiene suscripcion PRO
     select version
@@ -158,11 +160,17 @@ BEGIN
     insert into COMPRAS_PRODUCTOS
     (ID_USUARIO, FECHA_COMPRA, ID_PRODUCTO, ID_TIPO_PRODUCTO)
     values (p_id_usuario, SYSDATE, p_id_producto, p_id_tipo_producto);
+
+    -- Obtener id_categoria del producto
+	select id_categoria
+    into v_id_categoria
+    from productos p
+    where p.id_producto = p_id_producto;
     
     -- Insertar en CONFIGURACIONES_ROPA
     insert into CONFIGURACIONES_ROPA
-    (ID_ASISTENTE, ID_PRODUCTO, SELECCIONADO)
-    values (v_id_asistente, p_id_producto, 0);
+    (ID_ASISTENTE, ID_PRODUCTO,ID_CATEGORIA, SELECCIONADO)
+    values (v_id_asistente, p_id_producto,v_id_categoria, 0);
 
     COMMIT;
 

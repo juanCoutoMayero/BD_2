@@ -37,6 +37,24 @@ BEGIN
     END IF;
 END;
 
+-- Restricción en CONFIGURACIONES_APARIENCIAS. Un asistente virtual puede tener solo una APARIENCIA seleccionada por categoria .
+
+CREATE OR REPLACE TRIGGER deseleccionar_apariencia_duplicada
+BEFORE INSERT OR UPDATE ON CONFIGURACIONES_APARIENCIAS
+FOR EACH ROW
+BEGIN
+    -- Si la nueva apariencia está siendo seleccionada, deseleccionar la apariencia actual en la misma categoría
+    IF :NEW.SELECCIONADO = 1 THEN
+        UPDATE CONFIGURACIONES_APARIENCIAS
+        SET SELECCIONADO = 0
+        WHERE ID_ASISTENTE = :NEW.ID_ASISTENTE
+          AND ID_CATEGORIA = :NEW.ID_CATEGORIA
+          AND SELECCIONADO = 1
+          AND (:NEW.ID IS NULL OR ID <> :NEW.ID);  -- Evitar deseleccionar la misma fila en caso de UPDATE
+    END IF;
+END;
+
+
 -- Todo producto de tipo apariencias o ropa debe tener una categoría asociada. 
 
 CREATE OR REPLACE TRIGGER validar_categoria_productos
@@ -57,7 +75,26 @@ BEGIN
 END;
 
 
--- Restricción en PRODUCTOS. Solamente un PRODUCTO del mismo tipo de producto puede estar marcado como "por defecto".
+-- Las categorias solo pueden ser de tipo ROPA o Apariencia
+
+CREATE OR REPLACE TRIGGER validar_categorias_por_tipo_producto
+BEFORE INSERT OR UPDATE ON CATEGORIAS
+FOR EACH ROW
+DECLARE
+    v_tipo_producto VARCHAR2(50);
+BEGIN
+    -- Obtener el tipo de producto para validar su tipo
+    SELECT TIPO_PRODUCTO INTO v_tipo_producto
+    FROM TIPOS_PRODUCTO
+    WHERE ID_TIPO_PRODUCTO = :NEW.ID_TIPO_PRODUCTO;
+
+    -- Validar que el tipo de producto sea 'ROPA' o 'APARIENCIAS'
+    IF v_tipo_producto NOT IN ('ROPA', 'APARIENCIAS') THEN
+        RAISE_APPLICATION_ERROR(-20008, 'Las categorías solo pueden ser asociadas a tipos de producto "ROPA" o "APARIENCIAS".');
+    END IF;
+END;
+
+-- Restricción en PRODUCTOS. Solamente un PRODUCTO del mismo tipo de producto  y misma categoria puede estar marcado como "por defecto".
 
 CREATE OR REPLACE TRIGGER desmarcar_producto_por_defecto
 BEFORE INSERT OR UPDATE ON PRODUCTOS
@@ -70,6 +107,6 @@ BEGIN
         WHERE ID_TIPO_PRODUCTO = :NEW.ID_TIPO_PRODUCTO
           AND ID_CATEGORIA = :NEW.ID_CATEGORIA
           AND POR_DEFECTO = 1
-          AND (:NEW.ID IS NULL OR ID <> :NEW.ID);  -- Evitar deseleccionar la misma fila en caso de UPDATE
+          AND (:NEW.ID_PRODUCTO IS NULL OR ID_PRODUCTO <> :NEW.ID_PRODUCTO);  -- Evitar deseleccionar la misma fila en caso de UPDATE
     END IF;
 END;
